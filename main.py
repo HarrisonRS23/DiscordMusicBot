@@ -2,7 +2,7 @@ import discord
 import os
 from dotenv import load_dotenv
 from discord.ext import commands
-from discord import app_commands
+# from discord import app_commands
 import yt_dlp
 import asyncio
 
@@ -10,6 +10,7 @@ import asyncio
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_NUM = int(os.getenv("GUILD_ID"))
+
 class Client(commands.Bot):
 
     # called whenever bot has connected
@@ -17,11 +18,8 @@ class Client(commands.Bot):
         print(f'logged on as {self.user}')
 
         try: 
-             print(f"failing here {GUILD_NUM}")
              guild = discord.Object(id=GUILD_NUM)
-             print("worked")
              synced = await self.tree.sync(guild=guild)
-             print("worked")
              print (f'Synced {len(synced)} commands to guild {guild.id}')
         except Exception as e:
             print(f'Error syncing commands: {e}')
@@ -43,8 +41,6 @@ class Client(commands.Bot):
     async def on_reaction(self,reaction,user):
         await reaction.message.channel.send('You reacted')
         
-    
-
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True  # Enable voice state-related events
@@ -55,8 +51,6 @@ client = Client(command_prefix="", intents=intents)
 @client.event
 async def on_voice_state_update(member, before, after):
     print(f"{member.name} changed their voice state.")
-
-
 
 # id of developement server so that slash command only pushed to dev server while making changes
 GUILD_ID = discord.Object(id=GUILD_NUM)
@@ -87,7 +81,7 @@ async def connecter(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("You need to join a voice channel first!", ephemeral=True)
 
-@client.tree.command(name="disconnect", description="Disconnect the bot from the voice channel")
+@client.tree.command(name="disconnect", description="Disconnect the bot from the voice channel",guild=GUILD_ID)
 async def disconnecter(interaction: discord.Interaction):
     voice_client = interaction.guild.voice_client
     if voice_client:  # Check if the bot is in a voice channel
@@ -96,35 +90,51 @@ async def disconnecter(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("I'm not connected to any voice channel.", ephemeral=True)
 
-
 # Play YouTube video
 @client.tree.command(name="play", description="Play a YouTube video", guild=GUILD_ID)
 async def play(interaction: discord.Interaction, url: str):
-    embed = discord.Embed(title="Youtube title", url = url, description= "youtube description", color=discord.Color.red())
-    embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/2560px-YouTube_full-color_icon_%282017%29.svg.png")
-    embed.add_field(name="video", value= "video info")
-    embed.set_author(name=interaction.user.name)
-    voice_client = interaction.guild.voice_client
-    if not voice_client:
-        await interaction.response.send_message("I'm not connected to a voice channel.", ephemeral=True)
-        return
+    # Initially acknowledge the interaction and defer the response
+    await interaction.response.defer()
 
-    await interaction.response.send_message(f"Attempting to play: {url}")
-    
+    voice_client = interaction.guild.voice_client
+
+    # Check if the bot is already connected to a voice channel
+    if not voice_client:
+        if interaction.user.voice:
+            voice_channel = interaction.user.voice.channel
+            await voice_channel.connect()  # Connect to the user's voice channel
+            await interaction.followup.send(f"Connected to {voice_channel.name}!")
+            # Wait a moment for the connection to stabilize
+        else:
+            await interaction.followup.send("You need to join a voice channel first!", ephemeral=True)
+            return
+    else:
+        await interaction.followup.send("I'm already connected to a voice channel.")
+
+    # Now that we are sure the bot is connected, attempt to play the video
     try:
+        await interaction.followup.send(f"Attempting to play: {url}")
+
+        # Download and get the video info
         ydl_opts = {
             'format': 'bestaudio/best',
             'noplaylist': True,
             'quiet': True,
         }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             url2 = info['url']
             title = info.get('title', 'Unknown Title')
 
-        source = discord.FFmpegPCMAudio(url2, options="-vn")
-        voice_client.play(source, after=lambda e: print(f"Error: {e}") if e else None)
-        await interaction.followup.send(embed=embed)
+        voice_client = interaction.guild.voice_client
+        # Ensure the voice client exists and is connected before trying to play audio
+        if voice_client:
+            source = discord.FFmpegPCMAudio(url2, options="-vn")
+            voice_client.play(source, after=lambda e: print(f"Error: {e}") if e else None)
+            await interaction.followup.send(f"Now playing: **{title}**")
+        else:
+            await interaction.followup.send("Failed to find voice client. Ensure the bot is connected to a voice channel.")
 
     except Exception as e:
         await interaction.followup.send(f"Failed to play video: {e}")
