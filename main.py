@@ -9,9 +9,7 @@ import asyncio
 # Load environment variables from .env file
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID = os.getenv("GUILD_ID")
-
-
+GUILD_NUM = int(os.getenv("GUILD_ID"))
 class Client(commands.Bot):
 
     # called whenever bot has connected
@@ -19,8 +17,11 @@ class Client(commands.Bot):
         print(f'logged on as {self.user}')
 
         try: 
-             guild = discord.Object(id=GUILD_ID)
+             print(f"failing here {GUILD_NUM}")
+             guild = discord.Object(id=GUILD_NUM)
+             print("worked")
              synced = await self.tree.sync(guild=guild)
+             print("worked")
              print (f'Synced {len(synced)} commands to guild {guild.id}')
         except Exception as e:
             print(f'Error syncing commands: {e}')
@@ -58,7 +59,7 @@ async def on_voice_state_update(member, before, after):
 
 
 # id of developement server so that slash command only pushed to dev server while making changes
-GUILD_ID = discord.Object(id=GUILD_ID)
+GUILD_ID = discord.Object(id=GUILD_NUM)
 
 # name is name of slash command and must be lowercase
 @client.tree.command(name= "hello", description="Say hello!", guild=GUILD_ID)
@@ -103,7 +104,6 @@ async def play(interaction: discord.Interaction, url: str):
     embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/2560px-YouTube_full-color_icon_%282017%29.svg.png")
     embed.add_field(name="video", value= "video info")
     embed.set_author(name=interaction.user.name)
-    await interaction.response.send_message(embed=embed)
     voice_client = interaction.guild.voice_client
     if not voice_client:
         await interaction.response.send_message("I'm not connected to a voice channel.", ephemeral=True)
@@ -124,7 +124,8 @@ async def play(interaction: discord.Interaction, url: str):
 
         source = discord.FFmpegPCMAudio(url2, options="-vn")
         voice_client.play(source, after=lambda e: print(f"Error: {e}") if e else None)
-        await interaction.followup.send(f"Now playing: **{title}**")
+        await interaction.followup.send(embed=embed)
+
     except Exception as e:
         await interaction.followup.send(f"Failed to play video: {e}")
 
