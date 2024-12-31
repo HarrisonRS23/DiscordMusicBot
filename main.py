@@ -99,6 +99,11 @@ async def disconnecter(interaction: discord.Interaction):
 # Play YouTube video
 @client.tree.command(name="play", description="Play a YouTube video", guild=GUILD_ID)
 async def play(interaction: discord.Interaction, url: str):
+    embed = discord.Embed(title="Youtube title", url = url, description= "youtube description", color=discord.Color.red())
+    embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/2560px-YouTube_full-color_icon_%282017%29.svg.png")
+    embed.add_field(name="video", value= "video info")
+    embed.set_author(name=interaction.user.name)
+    await interaction.response.send_message(embed=embed)
     voice_client = interaction.guild.voice_client
     if not voice_client:
         await interaction.response.send_message("I'm not connected to a voice channel.", ephemeral=True)
