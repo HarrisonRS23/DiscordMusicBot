@@ -9,7 +9,7 @@ import asyncio
 # Load environment variables from .env file
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID = os.getenv("DISCORD_BOT_TOKEN")
+GUILD_ID = os.getenv("GUILD_ID")
 
 
 class Client(commands.Bot):
@@ -17,7 +17,6 @@ class Client(commands.Bot):
     # called whenever bot has connected
     async def on_ready(self): 
         print(f'logged on as {self.user}')
-
 
         try: 
              guild = discord.Object(id=GUILD_ID)
@@ -72,16 +71,6 @@ async def printer(interaction: discord.Interaction, printer: str):
     # respond to slash command with send messsage
     await interaction.response.send_message(printer)
 
-@client.tree.command(name= "play", description="I will play a youtube video" , guild=GUILD_ID)
-async def printer(interaction: discord.Interaction, youtube: str):
-    # respond to slash command with send messsage
-    #await interaction.response.send_message(youtube)
-    embed = discord.Embed(title="Youtube title", url = 'https://www.youtube.com', description= "youtube description", color=discord.Color.red())
-    embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/2560px-YouTube_full-color_icon_%282017%29.svg.png")
-    embed.add_field(name="video", value= "video info")
-    embed.set_author(name=interaction.user.name)
-    await interaction.response.send_message(embed=embed)
-
 @client.tree.command(name= "connect", description="I will connect to your channel" , guild=GUILD_ID)
 async def connecter(interaction: discord.Interaction):
     if interaction.user.voice:  # Check if the user is in a voice channel
@@ -105,5 +94,33 @@ async def disconnecter(interaction: discord.Interaction):
         await interaction.response.send_message("Disconnected from the voice channel.")
     else:
         await interaction.response.send_message("I'm not connected to any voice channel.", ephemeral=True)
+
+
+# Play YouTube video
+@client.tree.command(name="play", description="Play a YouTube video", guild=GUILD_ID)
+async def play(interaction: discord.Interaction, url: str):
+    voice_client = interaction.guild.voice_client
+    if not voice_client:
+        await interaction.response.send_message("I'm not connected to a voice channel.", ephemeral=True)
+        return
+
+    await interaction.response.send_message(f"Attempting to play: {url}")
+    
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'quiet': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            url2 = info['url']
+            title = info.get('title', 'Unknown Title')
+
+        source = discord.FFmpegPCMAudio(url2, options="-vn")
+        voice_client.play(source, after=lambda e: print(f"Error: {e}") if e else None)
+        await interaction.followup.send(f"Now playing: **{title}**")
+    except Exception as e:
+        await interaction.followup.send(f"Failed to play video: {e}")
 
 client.run(TOKEN)
